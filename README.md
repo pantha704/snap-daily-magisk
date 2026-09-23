@@ -61,6 +61,16 @@ Dismiss order: `OK` only for the Play-services title, then a named word (Not now
 
 If a blocker is still there after that: press **Back**, then re-check the page. Back fires only when a blocker is present (named word, Play-services title, or an unnamed wide button with width ≥ 350 and height ≥ 100 at cy ≥ 1600). An idle screen with no blocker is waited on, not backed out of. Max **4** Backs; if the page is still wrong, Snapchat is force-stopped and reopened, max **2** restarts; then the step fails with the on-screen title and queues a retry.
 
+## Offline
+
+Only the snap delivery and the Telegram messages need network. The 05:00 fire, the unlock, the taps and the screenshots are all local.
+
+No network at 05:00: the cycle does not tap anything. It writes `state/pending` with `offline` and exits 2, and the `*/5` watcher retries — so the snap goes out as soon as the phone is back online, the same day, not the next day. One deduped `snap daily queued: phone offline` notice is spooled and delivered when the network returns; the retries do not pile up.
+
+Telegram messages that cannot be delivered are written to `state/tgspool/` (max 20, oldest dropped) and flushed by the watcher on its next run. An `exit 2` cycle deliberately does not spool a log per retry, because `state/pending` already records it.
+
+`SNAP_ONLINE_HOSTS` overrides the two-host probe (`api.telegram.org`, `www.snapchat.com`). `SNAP_SKIP_ONLINE_CHECK=1` skips the probe entirely.
+
 ## Uninstall
 
 Magisk app → remove module. `uninstall.sh` deletes the 3 scripts + crontab. Leaves `secrets/`. Does not kill `crond`.
