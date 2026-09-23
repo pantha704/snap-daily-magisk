@@ -11,7 +11,9 @@ No token, no PIN, no chat id in this repo. Secrets stay on the phone.
 1. Magisk app → Modules → Install from storage → pick the zip.
 2. Or: `su -c "magisk --install-module snap-daily-v1.zip"`
 3. Reboot. Magisk stages the module in `/data/adb/modules_update/` and merges it at boot.
-4. Add secrets (see below). Then `su -c "/data/adb/snap_daily/run.sh"` for a manual test run.
+4. Add secrets (see below). Then `su -c "SNAP_DRY=1 sh /data/adb/snap_daily/run.sh"` for a dry run, or `su -c "/data/adb/snap_daily/run.sh"` for a real one.
+
+Dry run: `SNAP_DRY=1` walks wake, unlock, overlay kill, launch, popups, shutter, Send To, the fire chip and Select All, screenshots the send sheet, then force-stops Snapchat without tapping Send. It writes neither `state/last_ok` nor `state/pending`, so it cannot eat that day's snap. Use it after install to prove the path on your own phone.
 
 `crond` starter: module `service.sh` is the real one, and it is proven on the test phone (see Verified). A fallback `/data/adb/service.d/10-snap-crond.sh` is optional and only for the first install. Safe order:
 
@@ -77,6 +79,8 @@ On the device (rooted OnePlus 7T, Magisk 31.0):
 - `service.sh` run by hand against a sandbox `BASE`: 4 files copied, `755` on scripts, `700` on `crontabs` + `secrets`, `600` on the crontab, second run idempotent
 - `crond` already running → `service.sh` did not start a second one
 - `SNAP_SELFTEST=1 sh snap.sh` on the installed copy → `selftest ok`, and it needs no fixture file (it writes its own into `state/` and removes it)
+- `SNAP_DRY=1 sh run.sh` on the device → exit 0, log shows `unlocked`, `blocker dismiss: ok`, `recipient fire-select-all`, `dry run — stopping before Send`; the dump at that moment carried `Deselect All Button` (Select All had already been tapped), the fire chip beside All, and `Send` at cx 1013. Neither `last_ok` nor `pending` was written, and Snapchat was force-stopped
+- failsafe gates, sandboxed `BASE` with a stub `run.sh`: a held `state/runlock` makes the cycle log `already running` and exit 0; `pending` + not-done-today makes the watcher exec `run.sh`; done-today makes the watcher clear `pending` and not exec; no `pending` → quiet exit 0
 - `secrets/` untouched; persist supervisor, `tailscaled`, and `adbd` untouched
 
 Reboot test, twice, on the test phone:
