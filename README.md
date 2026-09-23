@@ -13,7 +13,7 @@ No token, no PIN, no chat id in this repo. Secrets stay on the phone.
 3. Reboot. Magisk stages the module in `/data/adb/modules_update/` and merges it at boot.
 4. Add secrets (see below). Then `su -c "/data/adb/snap_daily/run.sh"` for a manual test run.
 
-⊥ install the old `/data/adb/service.d/10-snap-crond.sh` too. Module `service.sh` owns `crond` now. Two boot hooks → two `crond`.
+`crond` starter: module `service.sh` is the real one. A fallback `/data/adb/service.d/10-snap-crond.sh` may stay during the first boot cycle; both starters are safe because `snap.sh` holds `state/runlock`, so a second `crond` cannot double-send. Remove the fallback once the module's boot step is confirmed.
 
 ## What it installs
 
