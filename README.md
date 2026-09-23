@@ -13,9 +13,13 @@ No token, no PIN, no chat id in this repo. Secrets stay on the phone.
 3. Reboot. Magisk stages the module in `/data/adb/modules_update/` and merges it at boot.
 4. Add secrets (see below). Then `su -c "/data/adb/snap_daily/run.sh"` for a manual test run.
 
-`crond` starter: module `service.sh` is the real one. A fallback `/data/adb/service.d/10-snap-crond.sh` is still installed while the module's boot step is unproven. Both starters are safe: each one checks `pidof crond` first, and `snap.sh` holds `state/runlock`, so a second `crond` cannot double-send. Remove the fallback only after a reboot proves the module started `crond` on its own.
+`crond` starter: module `service.sh` is the real one, and it is proven on the test phone (see Verified). A fallback `/data/adb/service.d/10-snap-crond.sh` is optional and only for the first install. Safe order:
 
-Order matters. Do not delete the fallback first. If the module's boot step has not been observed yet and the fallback is gone, a reboot leaves the phone with no `crond` and no scheduled snap.
+1. Flash the module, reboot.
+2. Confirm `crond` is up and the scripts in `/data/adb/snap_daily/` have fresh mtimes.
+3. Then delete the fallback, if you ever added one.
+
+Both starters check `pidof crond` first, and `snap.sh` holds `state/runlock`, so a second `crond` cannot double-send. Do not delete the fallback before step 2. If the module's boot step has not been observed and the fallback is gone, a reboot leaves the phone with no `crond` and no scheduled snap.
 
 ## What it installs
 
@@ -75,7 +79,15 @@ On the device (rooted OnePlus 7T, Magisk 31.0):
 - `SNAP_SELFTEST=1 sh snap.sh` on the installed copy → `selftest ok`, and it needs no fixture file (it writes its own into `state/` and removes it)
 - `secrets/` untouched; persist supervisor, `tailscaled`, and `adbd` untouched
 
-Not verified: the post-reboot merge and the `service.sh` launch. Magisk applies `modules_update` at boot, and that step needs a reboot to observe. Everything the boot step depends on is checked above.
+Reboot test, twice, on the test phone:
+
+- boot 1: `/data/adb/modules_update/snap-daily/` merged into `/data/adb/modules/snap-daily/`, `modules_update` gone, no `disable`, no `remove`, `skip_mount` present
+- boot 1: `crond` came up, `/data/adb/snap_daily/` scripts rewritten with fresh mtimes by `service.sh`
+- boot 2, with `/data/adb/service.d/10-snap-crond.sh` moved out of `service.d` first: `crond` still came up, alone, and the scripts were rewritten again
+- exactly one `crond` process after each boot; `crond.log` shows one start per boot
+- `secrets/` still `0600`, crontab still `0600`, `SNAP_SELFTEST=1 sh snap.sh` → `selftest ok`
+- persist supervisor, `tailscaled`, and `adbd` :5555 all back after each reboot
+- the `*/5` watcher ran 37 times across the log with no `state/pending` present, and sent nothing
 
 Not verified: recovery (TWRP) flash. That needs Magisk's own `module_installer.sh` as `META-INF/com/google/android/update-binary`. Not vendored here (Magisk is GPL-3.0, this tree is MIT). Install from the Magisk app.
 
