@@ -13,7 +13,9 @@ No token, no PIN, no chat id in this repo. Secrets stay on the phone.
 3. Reboot. Magisk stages the module in `/data/adb/modules_update/` and merges it at boot.
 4. Add secrets (see below). Then `su -c "/data/adb/snap_daily/run.sh"` for a manual test run.
 
-`crond` starter: module `service.sh` is the real one. A fallback `/data/adb/service.d/10-snap-crond.sh` may stay during the first boot cycle; both starters are safe because `snap.sh` holds `state/runlock`, so a second `crond` cannot double-send. Remove the fallback once the module's boot step is confirmed.
+`crond` starter: module `service.sh` is the real one. A fallback `/data/adb/service.d/10-snap-crond.sh` is still installed while the module's boot step is unproven. Both starters are safe: each one checks `pidof crond` first, and `snap.sh` holds `state/runlock`, so a second `crond` cannot double-send. Remove the fallback only after a reboot proves the module started `crond` on its own.
+
+Order matters. Do not delete the fallback first. If the module's boot step has not been observed yet and the fallback is gone, a reboot leaves the phone with no `crond` and no scheduled snap.
 
 ## What it installs
 
@@ -59,21 +61,25 @@ Static, on this repo:
 - `sh -n` clean on all 6 scripts
 - zip structure has `module.prop` at root
 
-On the device:
+On the device (rooted OnePlus 7T, Magisk 31.0):
 
-- `magisk --install-module` → exit 0, `customize.sh` output printed
-- files land in `/data/adb/modules_update/snap-daily/` + `update` marker → applies at next boot
-- module listed enabled, no `disable`, no `remove`
-- **Magisk's installer applies 0755/0644 to the whole module**, so `service.sh` arrived non-executable. `customize.sh` now calls `set_perm` on the 5 scripts and `crontabs/root`. Re-installed and confirmed: `service.sh` `0755`, `crontabs/root` `0600`
-- ran `service.sh` by hand: exit 0, all 4 files copied, `md5sum` matches payload, perms 755 / crontab 600
-- `crond` was already up → `service.sh` did not start a second one
-- `SNAP_SELFTEST=1 sh snap.sh` on the installed copy → `selftest ok`
-- `secrets/` untouched, crontab intact, persist supervisor + `tailscaled` + `adbd` untouched
-- legacy `/data/adb/service.d/10-snap-crond.sh` removed before the module took over
+- `module.prop`: `id` matches `^[a-zA-Z][a-zA-Z0-9._-]+$`, `versionCode` int, LF endings
+- `META-INF/com/google/android/updater-script` = exactly `#MAGISK`
+- `sh -n` clean on all scripts
+- zip has `module.prop` at root, no `.git`, no `README.md` / `LICENSE` / `build.sh`
+- `magisk --install-module snap-daily-v1.zip` → exit 0, `customize.sh` output printed, files staged in `/data/adb/modules_update/snap-daily/`
+- staged `service.sh` `0755`, `crontabs/root` `0600` (`customize.sh` calls `set_perm`; Magisk's own default is `0644`, which would leave `service.sh` non-executable)
+- staged `snap.sh` `sha256` equals the live `/data/adb/snap_daily/snap.sh` and the repo copy
+- `service.sh` run by hand against a sandbox `BASE`: 4 files copied, `755` on scripts, `700` on `crontabs` + `secrets`, `600` on the crontab, second run idempotent
+- `crond` already running → `service.sh` did not start a second one
+- `SNAP_SELFTEST=1 sh snap.sh` on the installed copy → `selftest ok`, and it needs no fixture file (it writes its own into `state/` and removes it)
+- `secrets/` untouched; persist supervisor, `tailscaled`, and `adbd` untouched
 
-Not verified: the post-reboot merge and `service.sh` launch. Magisk applies `modules_update` at boot, and that step needs a reboot to observe. Everything the boot step depends on is checked above.
+Not verified: the post-reboot merge and the `service.sh` launch. Magisk applies `modules_update` at boot, and that step needs a reboot to observe. Everything the boot step depends on is checked above.
 
 Not verified: recovery (TWRP) flash. That needs Magisk's own `module_installer.sh` as `META-INF/com/google/android/update-binary`. Not vendored here (Magisk is GPL-3.0, this tree is MIT). Install from the Magisk app.
+
+Leftover on the test phone, not from this module: `/data/adb/modules/disable` exists with a 1970 timestamp. Modules are still mounted (`/system/etc/hosts` matches the Re-Malwack module byte for byte), so it is not disabling anything. Left alone.
 
 ## License
 
