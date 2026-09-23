@@ -53,6 +53,14 @@ su -c "printf '%s\n' 'YOUR_TOKEN' > /data/adb/snap_daily/secrets/token && chmod 
 
 Create a Snapchat group named `🔥`, add the people who get the daily snap. Default send = Send To → `🔥` chip beside All → Select All → Send. Change members in Snapchat, not in code.
 
+## Popups and recovery
+
+A step is blocked when the next landmark is missing, a sheet covers it, or the same UI appears twice.
+
+Dismiss order: `OK` only for the Play-services title, then a named word (Not now, Skip, No thanks, Maybe later, Close, Cancel, Got it, Later, Deny, Not interested, Dismiss), then the wide unnamed footer pill (width 400–800, height 70–180, cy 2000–2320). Never Send, Send To, the shutter, Select All, Add, or the nav bar.
+
+If a blocker is still there after that: press **Back**, then re-check the page. Back fires only when a blocker is present (named word, Play-services title, or an unnamed wide button with width ≥ 350 and height ≥ 100 at cy ≥ 1600). An idle screen with no blocker is waited on, not backed out of. Max **4** Backs; if the page is still wrong, Snapchat is force-stopped and reopened, max **2** restarts; then the step fails with the on-screen title and queues a retry.
+
 ## Uninstall
 
 Magisk app → remove module. `uninstall.sh` deletes the 3 scripts + crontab. Leaves `secrets/`. Does not kill `crond`.
@@ -81,6 +89,9 @@ On the device (rooted OnePlus 7T, Magisk 31.0):
 - `SNAP_SELFTEST=1 sh snap.sh` on the installed copy → `selftest ok`, and it needs no fixture file (it writes its own into `state/` and removes it)
 - `SNAP_DRY=1 sh run.sh` on the device → exit 0, log shows `unlocked`, `blocker dismiss: ok`, `recipient fire-select-all`, `dry run — stopping before Send`; the dump at that moment carried `Deselect All Button` (Select All had already been tapped), the fire chip beside All, and `Send` at cx 1013. Neither `last_ok` nor `pending` was written, and Snapchat was force-stopped
 - failsafe gates, sandboxed `BASE` with a stub `run.sh`: a held `state/runlock` makes the cycle log `already running` and exit 0; `pending` + not-done-today makes the watcher exec `run.sh`; done-today makes the watcher clear `pending` and not exec; no `pending` → quiet exit 0
+- `SNAP_SELFTEST=1` also asserts the blocker gate: a camera screen (shutter plus nav) is **not** a blocker, and a wide unnamed sheet button is
+- back rule seen live: `back 1/4 for ready` → `back landed on expected page` → the run continued to `recipient fire-select-all` and stopped at the dry-run point, exit 0
+- after wiping `/data/adb/snap_daily` entirely and re-running the module's `service.sh`, the tree comes back with `snap.sh` `sha256` equal to the module's copy, the crontab intact, `secrets/` `0600`, and the same dry run passes
 - `secrets/` untouched; persist supervisor, `tailscaled`, and `adbd` untouched
 
 Reboot test, twice, on the test phone:
