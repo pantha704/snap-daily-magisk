@@ -26,7 +26,7 @@ Both starters check `pidof crond` first, and `snap.sh` holds `state/runlock`, so
 ## What it installs
 
 - `snap.sh` `run.sh` `watch.sh` → `/data/adb/snap_daily/`
-- crontab → `/data/adb/snap_daily/crontabs/root` (`0 5 * * *` + `*/5`, `TZ=Asia/Kolkata`)
+- crontab → `/data/adb/snap_daily/crontabs/root` (`*/5` heartbeat only, see below)
 - `service.sh` at late_start: copy the 4 files, `chmod`, start `crond` if absent
 
 Does not install:
@@ -60,6 +60,23 @@ A step is blocked when the next landmark is missing, a sheet covers it, or the s
 Dismiss order: `OK` only for the Play-services title, then a named word (Not now, Skip, No thanks, Maybe later, Close, Cancel, Got it, Later, Deny, Not interested, Dismiss), then the wide unnamed footer pill (width 400–800, height 70–180, cy 2000–2320). Never Send, Send To, the shutter, Select All, Add, or the nav bar.
 
 If a blocker is still there after that: press **Back**, then re-check the page. Back fires only when a blocker is present (named word, Play-services title, or an unnamed wide button with width ≥ 350 and height ≥ 100 at cy ≥ 1600). An idle screen with no blocker is waited on, not backed out of. Max **4** Backs; if the page is still wrong, Snapchat is force-stopped and reopened, max **2** restarts; then the step fails with the on-screen title and queues a retry.
+
+## The schedule, and why no cron hour is used
+
+busybox `crond` on this device matches the crontab **in UTC and ignores `TZ` in its own environment**. Measured 2026-09-24 with `TZ=Asia/Kolkata` in the daemon: `* 5 * * *` fired during UTC hour 5 while `* 10 * * *` stayed silent during IST hour 10. So `0 5 * * *` means **05:00 UTC = 10:30 IST** — that is how the snap went out 5.5 hours late, with the log itself showing `[10:30]` while the filename stamp read `20260924T050001Z`.
+
+The `TZ=` line inside the crontab file sets the **job** environment only; it does not move the schedule clock.
+
+So the crontab carries a 5-minute heartbeat and nothing else — every 5 minutes is every 5 minutes in any zone. `watch.sh` makes the daily decision with an explicit IST comparison:
+
+1. Telegram spool flush
+2. `last_ok` is today → clear `pending`, exit
+3. `pending` exists → run (a queued pre-send miss always retries)
+4. else, if IST time ≥ `DUE_MIN` (default `300` = 05:00 IST) and `state/ran_<IST date>` does not exist → run
+
+`snap.sh` writes `state/ran_<date>` as soon as it takes the run lock, so the IST day is consumed even when the proof text never appears, and a proof-miss cannot loop. Dry runs and the selftest never write it. Stale markers are pruned by the watcher. `SNAP_DUE_MIN` moves the fire time; `SNAP_NOW_MIN` fakes "now" for tests.
+
+Side benefits: a missed tick is harmless (the next one still fires the same IST day), and a phone that was asleep at 05:00 sends as soon as it wakes rather than skipping the day.
 
 ## Offline
 

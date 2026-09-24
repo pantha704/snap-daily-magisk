@@ -3,4 +3,4 @@ name=snap-daily
 version=v1
 versionCode=1
 author=pantha704
-description=05:00 IST camera snap. Installs scripts + crond. Not an LSPosed hook.
+description=05:00 IST camera snap. Installs scripts + crond. Not an LSPosed hook. Daily decision is IST-checked in watch.sh, never a cron hour.
