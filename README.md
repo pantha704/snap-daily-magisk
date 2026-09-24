@@ -9,7 +9,7 @@ No token, no PIN, no chat id in this repo. Secrets stay on the phone.
 ## Install
 
 1. Magisk app → Modules → Install from storage → pick the zip.
-2. Or: `su -c "magisk --install-module snap-daily-v1.zip"`
+2. Or: `su -c "magisk --install-module snap-daily-v1.1.zip"`
 3. Reboot. Magisk stages the module in `/data/adb/modules_update/` and merges it at boot.
 4. Add secrets (see below). Then `su -c "SNAP_DRY=1 sh /data/adb/snap_daily/run.sh"` for a dry run, or `su -c "/data/adb/snap_daily/run.sh"` for a real one.
 
@@ -108,7 +108,7 @@ On the device (rooted OnePlus 7T, Magisk 31.0):
 - `META-INF/com/google/android/updater-script` = exactly `#MAGISK`
 - `sh -n` clean on all scripts
 - zip has `module.prop` at root, no `.git`, no `README.md` / `LICENSE` / `build.sh`
-- `magisk --install-module snap-daily-v1.zip` → exit 0, `customize.sh` output printed, files staged in `/data/adb/modules_update/snap-daily/`
+- `magisk --install-module snap-daily-v1.1.zip` → exit 0, `customize.sh` output printed, files staged in `/data/adb/modules_update/snap-daily/`
 - staged `service.sh` `0755`, `crontabs/root` `0600` (`customize.sh` calls `set_perm`; Magisk's own default is `0644`, which would leave `service.sh` non-executable)
 - staged `snap.sh` `sha256` equals the live `/data/adb/snap_daily/snap.sh` and the repo copy
 - `service.sh` run by hand against a sandbox `BASE`: 4 files copied, `755` on scripts, `700` on `crontabs` + `secrets`, `600` on the crontab, second run idempotent
