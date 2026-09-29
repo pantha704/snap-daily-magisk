@@ -98,7 +98,7 @@ fire group plus a Telegram photo per attempt. All of it is now bounded:
 | Guard | Rule |
 | --- | --- |
 | Retry cap | At most `SNAP_MAX_TRIES` (3) attempts per IST day, first try included. After that: `gaveup_<date>`, one notice, done. |
-| Retry window | Retries stop `SNAP_RETRY_WINDOW` (300 min) after the due time, i.e. 10:00 IST at the default 05:00 IST. |
+| Retry window | Every attempt — the first one included — happens inside `SNAP_RETRY_WINDOW` (60 min) of the due time, so the snap is a 05:00–06:00 IST thing. A morning the phone slept through stays missed rather than firing at a random later hour, and you get one `window passed` notice. |
 | Battery floor | Below `SNAP_MIN_BATTERY` (15%) the phone is not woken at all: no unlock, no screen, no chase. The day stays open, so it fires once charged. |
 | One snap per day | Tapping Send writes `state/sent_<date>` and clears `pending`, proof text or not. A second snap cannot go out that day. |
 | One failure notice | One failure photo per IST day. Retries of the same failure stay silent (`state/notified_<date>_fail`). |
