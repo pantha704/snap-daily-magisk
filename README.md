@@ -88,6 +88,31 @@ Telegram messages that cannot be delivered are written to `state/tgspool/` (max 
 
 `SNAP_ONLINE_HOSTS` overrides the two-host probe (`api.telegram.org`, `www.snapchat.com`). `SNAP_SKIP_ONLINE_CHECK=1` skips the probe entirely.
 
+## Guards (why this cannot run away)
+
+A queued miss used to re-run every 5 minutes with no cap, no battery check and
+no window, and a cycle that tapped Send but could not read the proof text never
+closed the day. Together those two turned one bad morning into 24 snaps in the
+fire group plus a Telegram photo per attempt. All of it is now bounded:
+
+| Guard | Rule |
+| --- | --- |
+| Retry cap | At most `SNAP_MAX_TRIES` (3) attempts per IST day, first try included. After that: `gaveup_<date>`, one notice, done. |
+| Retry window | Retries stop `SNAP_RETRY_WINDOW` (300 min) after the due time, i.e. 10:00 IST at the default 05:00 IST. |
+| Battery floor | Below `SNAP_MIN_BATTERY` (15%) the phone is not woken at all: no unlock, no screen, no chase. The day stays open, so it fires once charged. |
+| One snap per day | Tapping Send writes `state/sent_<date>` and clears `pending`, proof text or not. A second snap cannot go out that day. |
+| One failure notice | One failure photo per IST day. Retries of the same failure stay silent (`state/notified_<date>_fail`). |
+| PIN self-heal | Cleared for the unlock path, the state file `pin_cleared` is dropped. A run killed mid-cycle leaves it behind, and the watcher relocks the phone on its next tick. |
+| crond watchdog | `service.sh` keeps a detached supervisor: if our crond dies, it is restarted within 5 minutes. Nothing else watches it. |
+
+Deterministic checks for the watcher logic live in `test_watch.sh` (23 cases:
+due time, attempt cap, window, battery, sent guard, PIN heal, notice dedupe,
+marker pruning). It runs on the phone against any copy of `watch.sh`:
+
+```sh
+sh test_watch.sh /data/adb/snap_daily/watch.sh
+```
+
 ## Uninstall
 
 Magisk app → remove module. `uninstall.sh` deletes the 3 scripts + crontab. Leaves `secrets/`. Does not kill `crond`.

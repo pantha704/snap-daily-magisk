@@ -45,3 +45,24 @@ fi
 if [ -z "$ours" ]; then
   TZ="$TZONE" /system/xbin/crond -b -L "$BASE/crond.log" -c "$BASE/crontabs"
 fi
+
+# Keep crond alive. Nothing else restarts it: if the daemon dies (crash, OOM
+# kill, a stray pkill) the daily snap silently never runs again. Detached on
+# purpose so it outlives this boot script.
+/system/xbin/busybox setsid sh -c '
+BASE=/data/adb/snap_daily
+TZONE='"$TZONE"'
+while true; do
+  sleep 300
+  alive=0
+  for p in $(pidof crond); do
+    if tr "\0" " " < "/proc/$p/cmdline" 2>/dev/null | grep -q "$BASE/crontabs"; then
+      alive=1
+    fi
+  done
+  if [ "$alive" = 0 ]; then
+    printf "crond watchdog: restarting at %s\n" "$(date "+%F %T")" >> "$BASE/crond.log"
+    TZ="$TZONE" /system/xbin/crond -b -L "$BASE/crond.log" -c "$BASE/crontabs"
+  fi
+done
+' >/dev/null 2>&1 &
