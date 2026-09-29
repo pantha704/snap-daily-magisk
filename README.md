@@ -9,7 +9,7 @@ No token, no PIN, no chat id in this repo. Secrets stay on the phone.
 ## Install
 
 1. Magisk app → Modules → Install from storage → pick the zip.
-2. Or: `su -c "magisk --install-module snap-daily-v1.1.zip"`
+2. Or: `su -c "magisk --install-module snap-daily-v1.3.zip"`
 3. Reboot. Magisk stages the module in `/data/adb/modules_update/` and merges it at boot.
 4. Add secrets (see below). Then `su -c "SNAP_DRY=1 sh /data/adb/snap_daily/run.sh"` for a dry run, or `su -c "/data/adb/snap_daily/run.sh"` for a real one.
 
@@ -25,15 +25,16 @@ Both starters check `pidof crond` first, and `snap.sh` holds `state/runlock`, so
 
 ## What it installs
 
-- `snap.sh` `run.sh` `watch.sh` → `/data/adb/snap_daily/`
-- crontab → `/data/adb/snap_daily/crontabs/root` (`*/5` heartbeat only, see below)
-- `service.sh` at late_start: copy the 4 files, `chmod`, start `crond` if absent
+- `snap.sh` `run.sh` `watch.sh` `keepalive.sh` → `/data/adb/snap_daily/`
+- crontab → `/data/adb/snap_daily/crontabs/root` (`*/5` heartbeat + `keepalive.sh`)
+- `service.sh` at late_start: copy the 5 files, `chmod`, start `crond` if absent, arm a detached crond supervisor
 
 Does not install:
 
 - PIN, bot token, chat id → you create `secrets/` mode 600
-- Wi-Fi / ADB 5555 / Tailscale loop → separate supervisor, see snap-daily README
 - Snapchat, LSPosed hook, Zygisk lib
+
+`keepalive.sh` re-raises the rest of the rooted chain (see Reboot resilience).
 
 ## Secrets
 
@@ -72,11 +73,27 @@ So the crontab carries a 5-minute heartbeat and nothing else — every 5 minutes
 1. Telegram spool flush
 2. `last_ok` is today → clear `pending`, exit
 3. `pending` exists → run (a queued pre-send miss always retries)
-4. else, if IST time ≥ `DUE_MIN` (default `300` = 05:00 IST) and `state/ran_<IST date>` does not exist → run
+4. else, if IST time is inside `DUE_MIN` (default `300` = 05:00 IST) to `DUE_MIN + SNAP_RETRY_WINDOW` (default 60 min, so 06:00 IST) and `state/ran_<IST date>` does not exist → run
 
 `snap.sh` writes `state/ran_<date>` as soon as it takes the run lock, so the IST day is consumed even when the proof text never appears, and a proof-miss cannot loop. Dry runs and the selftest never write it. Stale markers are pruned by the watcher. `SNAP_DUE_MIN` moves the fire time; `SNAP_NOW_MIN` fakes "now" for tests.
 
-Side benefits: a missed tick is harmless (the next one still fires the same IST day), and a phone that was asleep at 05:00 sends as soon as it wakes rather than skipping the day.
+The window binds the **first** attempt too, not just retries: it is a 05:00 IST snap, so a morning the phone slept through is reported as missed rather than sent at a random hour. One `window passed` notice per day.
+
+Side benefit: a missed 5-minute tick is harmless — the next one still fires the same IST day.
+
+## Reboot resilience (v1.3)
+
+Measured 2026-09-29: a restart at 10:05 brought Android back with apps and mobile data working, but **Magisk's boot stage never ran that boot**. No `service.d`, no module `service.sh`. The phone was on and unreachable: no `tailscaled`, no adb 5555, no ssh, and nothing inside the phone could recover, because every rooted process there hangs off that one stage. Proof: the supervisor's own persistent log jumps straight from `09-29 02:17:36` to `11:17:56`, the crond/supervisor start markers only appear after the next real boot, and no file under `/data/adb` was written in the whole window.
+
+So the chain now has more than one launch point:
+
+- `service.d/00-persist.sh` + this module's `service.sh` — the original boot stage
+- `post-fs-data.d/00-persist-early.sh` — a **different** Magisk stage, so a late_start that does not run is not fatal
+- `keepalive.sh` on the crond heartbeat (`2,7,12,...` every 5 min, offset from `watch.sh`) — `crond` is the only rooted daemon here with its own supervisor, so it re-raises everything else
+
+`keepalive.sh` checks, in order: the supervisor (`persist/run.sh`) alive → `tailscaled` alive → the **tunnel** actually up (userspace tailscaled can stay alive with a dead tunnel after a network reset, which looks healthy to `pidof`) → `persist.adb.tcp.port` / `service.adb.tcp.port` = 5555 and `adbd` running → `wlan0` up. Silent when healthy; logs to `/data/adb/snap_daily/keepalive.log` only when it acts.
+
+Verified by killing things for real (2026-09-29): `kill -9` tailscaled → keepalive restarted it; `kill -9` the supervisor → keepalive relaunched it and `persist/run.pid` moved to the new PID; healthy state → keepalive wrote nothing.
 
 ## Offline
 

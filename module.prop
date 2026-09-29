@@ -1,6 +1,6 @@
 id=snap-daily
 name=snap-daily
-version=v1.2
-versionCode=3
+version=v1.3
+versionCode=4
 author=pantha704
-description=05:00 IST camera snap. Installs scripts + crond. Not an LSPosed hook. Daily decision is IST-checked in watch.sh, never a cron hour. v1.2: retry cap, retry window, battery floor, one-snap-per-day sent guard, PIN self-heal, crond watchdog.
+description=05:00 IST camera snap. Installs scripts + crond. Not an LSPosed hook. Daily decision is IST-checked in watch.sh, never a cron hour. v1.2: retry cap, retry window, battery floor, one-snap-per-day sent guard, PIN self-heal, crond watchdog. v1.3: attempts confined to the 05:00-06:00 IST window, Snapchat closed after the day is done so the camera is not left warm, keepalive that re-raises tailscaled / adb 5555 / ssh / wifi from the crond heartbeat, post-fs-data second boot stage.

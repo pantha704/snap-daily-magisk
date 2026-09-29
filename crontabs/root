@@ -9,3 +9,9 @@ PATH=/system/bin:/system/xbin
 # = 10:30 IST. Every-5-minutes is timezone-proof, so watch.sh decides the daily
 # fire by comparing IST time against DUE_MIN (default 05:00 IST).
 */5 * * * * /data/adb/snap_daily/watch.sh
+# Offset by 2 minutes so it never overlaps watch.sh. Everything rooted on this
+# phone is raised by Magisk's boot stage; crond is the only rooted daemon with its
+# own supervisor, so it also re-raises tailscaled / adb 5555 / ssh / wifi. On
+# 2026-09-29 a restart skipped the Magisk stage and the phone came back online
+# with none of them running and no way for the phone itself to fix that.
+2,7,12,17,22,27,32,37,42,47,52,57 * * * * /data/adb/snap_daily/keepalive.sh
