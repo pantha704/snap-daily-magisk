@@ -26,7 +26,7 @@ Both starters check `pidof crond` first, and `snap.sh` holds `state/runlock`, so
 ## What it installs
 
 - `snap.sh` `run.sh` `watch.sh` `keepalive.sh` → `/data/adb/snap_daily/`
-- crontab → `/data/adb/snap_daily/crontabs/root` (`*/5` heartbeat + `keepalive.sh`)
+- crontab → `/data/adb/snap_daily/crontabs/root` (`*/15` heartbeat + `keepalive.sh`)
 - `service.sh` at late_start: copy the 5 files, `chmod`, start `crond` if absent, arm a detached crond supervisor
 
 Does not install:
@@ -68,7 +68,7 @@ busybox `crond` on this device matches the crontab **in UTC and ignores `TZ` in 
 
 The `TZ=` line inside the crontab file sets the **job** environment only; it does not move the schedule clock.
 
-So the crontab carries a 5-minute heartbeat and nothing else — every 5 minutes is every 5 minutes in any zone. `watch.sh` makes the daily decision with an explicit IST comparison:
+So the crontab carries a heartbeat and nothing else — every 15 minutes is every 15 minutes in any zone. `watch.sh` makes the daily decision with an explicit IST comparison:
 
 1. Telegram spool flush
 2. `last_ok` is today → clear `pending`, exit
@@ -89,7 +89,7 @@ So the chain now has more than one launch point:
 
 - `service.d/00-persist.sh` + this module's `service.sh` — the original boot stage
 - `post-fs-data.d/00-persist-early.sh` — a **different** Magisk stage, so a late_start that does not run is not fatal
-- `keepalive.sh` on the crond heartbeat (`2,7,12,...` every 5 min, offset from `watch.sh`) — `crond` is the only rooted daemon here with its own supervisor, so it re-raises everything else
+- `keepalive.sh` on the crond heartbeat (`7,22,37,52` — every 15 min, offset from `watch.sh`) — `crond` is the only rooted daemon here with its own supervisor, so it re-raises everything else
 
 `keepalive.sh` checks, in order: the supervisor (`persist/run.sh`) alive → `tailscaled` alive → the **tunnel** actually up (userspace tailscaled can stay alive with a dead tunnel after a network reset, which looks healthy to `pidof`) → `persist.adb.tcp.port` / `service.adb.tcp.port` = 5555 and `adbd` running → `wlan0` up. Silent when healthy; logs to `/data/adb/snap_daily/keepalive.log` only when it acts.
 
