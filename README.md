@@ -9,7 +9,7 @@ No token, no PIN, no chat id in this repo. Secrets stay on the phone.
 ## Install
 
 1. Magisk app → Modules → Install from storage → pick the zip.
-2. Or: `su -c "magisk --install-module snap-daily-v1.3.zip"`
+2. Or: `su -c "magisk --install-module snap-daily-v1.4.zip"`
 3. Reboot. Magisk stages the module in `/data/adb/modules_update/` and merges it at boot.
 4. Add secrets (see below). Then `su -c "SNAP_DRY=1 sh /data/adb/snap_daily/run.sh"` for a dry run, or `su -c "/data/adb/snap_daily/run.sh"` for a real one.
 
@@ -61,6 +61,22 @@ A step is blocked when the next landmark is missing, a sheet covers it, or the s
 Dismiss order: `OK` only for the Play-services title, then a named word (Not now, Skip, No thanks, Maybe later, Close, Cancel, Got it, Later, Deny, Not interested, Dismiss), then the wide unnamed footer pill (width 400–800, height 70–180, cy 2000–2320). Never Send, Send To, the shutter, Select All, Add, or the nav bar.
 
 If a blocker is still there after that: press **Back**, then re-check the page. Back fires only when a blocker is present (named word, Play-services title, or an unnamed wide button with width ≥ 350 and height ≥ 100 at cy ≥ 1600). An idle screen with no blocker is waited on, not backed out of. Max **4** Backs; if the page is still wrong, Snapchat is force-stopped and reopened, max **2** restarts; then the step fails with the on-screen title and queues a retry.
+
+## The unlock, and the stuck notification shade (v1.4)
+
+The keyguard here was dropped by clearing the PIN and then **restarting SystemUI**. That restart is what leaves the notification shade open over the lock screen, and once the shade has focus, nothing gets rid of it: measured 2026-10-06 with the shade focused, all of these failed —
+
+- `input keyevent 4` (Back) and `keyevent 3` (Home — ignored while locked)
+- `cmd statusbar collapse`
+- `wm dismiss-keyguard`
+- a bottom-edge home-gesture swipe, and a slow swipe up through the shade
+- `killall com.android.systemui` (the shade came back with the new SystemUI)
+
+The result was two dead mornings: 10-05 and 10-06 both ended as `no shutter [focus=NotificationShade]` with the phone awake and unlocked, Snapchat launched and invisible behind the shade. The trigger was ordinary — WhatsApp and Facebook updated on 10-04 (13:52 and 22:09) and left heads-up notifications on the lock screen.
+
+The unlock now clears the PIN and **swipes up** instead, so SystemUI is never restarted and the shade never appears. That sequence unlocked a locked phone with the shade already up, first try, and the cycle went on to reach the camera, the preview, Send To and the 🔥 chip. The SystemUI restart stays as a fallback, only if three swipes do not take.
+
+Belt and braces: the wait loop treats a focused shade as a blocker (collapse, then a swipe up, then a Snapchat restart) so a shade that appears for some other reason is cleared rather than waited out for 40 seconds.
 
 ## The schedule, and why no cron hour is used
 
