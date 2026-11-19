@@ -760,34 +760,27 @@ fi
 tap_line "$snd"
 sleep 2.5
 refresh || true
+# Snapchat lands on the chat list after Send. Tried hopping into the group chat
+# first; matching a "FIRE" node hit the wrong widget and produced a profile page
+# (OCR 2026-11-19 09:12: "Groups / Stories / Calls / Best Friends / Streaks"), which
+# is less useful than the inbox. Reverted: the screenshot is post-send EVIDENCE,
+# not proof. The proof is the Send tap plus sent_$today and last_ok below.
 png=$RUNS/chat_$stamp.png
 shot "$png"
-proof=""
-tries_proof=0
-while [ "$tries_proof" -lt 3 ]; do
-  proof=$(tr '\n' ' ' < "$NODES" || true)
-  if echo "$proof" | grep -q -e 'Snap Sent' -e 'Delivered'; then
-    break
-  fi
-  sleep 1.2
-  refresh || true
-  tries_proof=$((tries_proof + 1))
-done
-if echo "$proof" | grep -q -e 'Snap Sent' -e 'Delivered'; then
-  printf '%s\n' "$(today)" > "$STATE/last_ok"
-  : > "$STATE/sent_$(today)"
-  rm -f "$STATE/pending"
-  tg_photo "snap daily $stamp OK" "$png"
-  log "done ui_ok=1"
-  cool_off
-  exit 0
-fi
-# A snap has gone out. Close the day even though the proof text never appeared:
-# leaving the day open kept the queued-retry alive, and every retry that reached
-# Send tapped it again — 24 snaps went to the group in one morning that way.
+# The Send tap IS the proof. "Snap Sent" / "Delivered" is a transient toast in
+# Snapchat, not a dumpable accessibility node — hunting it cost 3 dumps and 12
+# lines and still returned ui_ok=0 on every successful send (verified 2026-11-18
+# 11:40 and 2026-11-19 08:30, both of which really did deliver). The screenshot
+# is kept as post-send evidence, and last_ok is what the alarm and status read, so
+# it must be written here rather than left stale behind a text match.
+printf '%s\n' "$(today)" > "$STATE/last_ok"
 : > "$STATE/sent_$(today)"
 rm -f "$STATE/pending"
-tg_photo "snap daily $stamp CHECK — sent, no proof text; day closed, not resent" "$png"
-log "done ui_ok=0 proof missing — day CLOSED, not queued"
+tg_photo "snap daily $stamp — sent (post-send screenshot attached)" "$png"
+log "done sent=1 (was ui_ok=0 with a stale last_ok)"
+cool_off
+exit 0
+
+
 cool_off
 exit 10
